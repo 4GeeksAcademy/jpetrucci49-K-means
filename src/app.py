@@ -38,7 +38,7 @@ def assign_clusters(model: KMeans, X: pd.DataFrame) -> pd.DataFrame:
 
 
 def train_classifier(X_train: pd.DataFrame, random_state: int = 42) -> RandomForestClassifier:
-    model = RandomForestClassifier(n_estimators=200, random_state=random_state, n_jobs=-1)
+    model = RandomForestClassifier(n_estimators=100, max_depth=14, random_state=random_state, n_jobs=-1)
     model.fit(X_train[FEATURES], X_train["cluster"])
     return model
 
