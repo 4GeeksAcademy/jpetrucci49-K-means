@@ -3,6 +3,8 @@ from pickle import dump
 
 import pandas as pd
 from sklearn.cluster import KMeans
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,24 +37,40 @@ def assign_clusters(model: KMeans, X: pd.DataFrame) -> pd.DataFrame:
     return labeled
 
 
-def save_artifacts(model: KMeans, X_train: pd.DataFrame, X_test: pd.DataFrame) -> None:
+def train_classifier(X_train: pd.DataFrame, random_state: int = 42) -> RandomForestClassifier:
+    model = RandomForestClassifier(n_estimators=200, random_state=random_state, n_jobs=-1)
+    model.fit(X_train[FEATURES], X_train["cluster"])
+    return model
+
+
+def save_artifacts(
+    kmeans: KMeans,
+    classifier: RandomForestClassifier,
+    X_train: pd.DataFrame,
+    X_test: pd.DataFrame,
+) -> None:
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     X_train.to_csv(PROCESSED_DIR / "housing_train.csv", index=False)
     X_test.to_csv(PROCESSED_DIR / "housing_test.csv", index=False)
     with open(MODELS_DIR / "kmeans_housing.sav", "wb") as file:
-        dump(model, file)
+        dump(kmeans, file)
+    with open(MODELS_DIR / "random_forest_housing.sav", "wb") as file:
+        dump(classifier, file)
 
 
 def main() -> None:
     X = load_features()
     X_train, X_test = split_data(X)
 
-    model = train_kmeans(X_train)
-    X_train = assign_clusters(model, X_train)
-    X_test = assign_clusters(model, X_test)
+    kmeans = train_kmeans(X_train)
+    X_train = assign_clusters(kmeans, X_train)
+    X_test = assign_clusters(kmeans, X_test)
 
-    save_artifacts(model, X_train, X_test)
+    classifier = train_classifier(X_train)
+    y_pred = classifier.predict(X_test[FEATURES])
+
+    save_artifacts(kmeans, classifier, X_train, X_test)
 
     print(f"Train houses: {len(X_train)}")
     print(f"Test houses: {len(X_test)}")
@@ -60,7 +78,10 @@ def main() -> None:
     print(X_train["cluster"].value_counts().sort_index().to_string())
     print("Test cluster counts:")
     print(X_test["cluster"].value_counts().sort_index().to_string())
-    print(f"Saved model to {MODELS_DIR / 'kmeans_housing.sav'}")
+    print(f"\nClassifier test accuracy: {accuracy_score(X_test['cluster'], y_pred):.4f}")
+    print(classification_report(X_test["cluster"], y_pred, digits=3))
+    for saved in sorted(MODELS_DIR.glob("*.sav")):
+        print(f"Saved {saved.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
